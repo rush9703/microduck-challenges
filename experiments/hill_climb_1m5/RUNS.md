@@ -21,7 +21,8 @@ One section per run, newest first, in the format of the challenge's AGENTS.md "R
   `rushzealot/mjlab-hillclimb1m5-microduck-base-s1`; W&B `.../microduck-arena/runs/eval-base-s1`
 - best: checkpoint 750, **5.064 s, 5/5 at 0.55 m/s**   (reference 5.876 s); the Space re-timed it at 5.064 s
 - others: 500 8.544 s 5/5 · 1000 5.816 s 5/5 · 1250 18.008 s 4/5 · 1500 6.344 s 5/5 ·
-  1750 7.120 s 5/5 · 2000 7.020 s 5/5 (2250+ pending at the time of writing)
+  1750 7.120 s 5/5 · 2000 7.020 s 5/5 · 2250 49.036 s 5/5 (at 0.90 m/s) · 2500 6.708 s 5/5 ·
+  2750 17.772 s 4/5 · 2999 6.672 s 5/5. Finished 08:18 UTC; all 13 checkpoints + evals on HF.
 - curves at 2254: episode length 978 of 1000, fell_over 0.17/iteration, track_linear_velocity 1.02
   and heading_hold 0.65, both still rising, nan_state 0. The curves keep improving while the Arena
   score worsens after 750: suspect the curricula that tighten after 750 (action_rate up to -1.0,

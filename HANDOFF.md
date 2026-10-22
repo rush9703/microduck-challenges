@@ -67,9 +67,8 @@ tools/status.py and tell me where things stand and what you propose next."*
 - **2026-10-22 07:38 UTC: published** checkpoint 750 of `base-s1` (user's yes) from the Windows PC:
   `rushzealot/microduck-hillclimb-base-s1`, entered as `hillclimb-base-s1`, **5.064 s 5/5**, board rank
   75/83 (19 by person), 110 player points. Details in `experiments/hill_climb_1m5/RUNS.md`.
-  `base-s1` was still training at the time (2464/3000, expected end ~08:20 UTC); its checkpoints
-  2250-2999 are scored by the watcher into HF `status.json`: read them with `tools/status.py` and
-  update RUNS.md. If one beats 5.064 s 5/5, ask the user before publishing it.
+  `base-s1` **finished 08:18 UTC**; all 13 checkpoints scored and on HF. None beat 750 (later ones
+  6.7-49 s), so nothing else to publish. Colab runtime to be deleted by the user (saves units).
 
 ## Next step
 
