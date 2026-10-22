@@ -52,7 +52,33 @@ pose std for long strides was worse (reverted "dash5"); `upright` std² 0.2 help
 Matches our own observation: base-s1's Arena score got worse after iteration 750 exactly as the
 action_rate and standing-env curricula tightened.
 
-## Possible next runs (one hypothesis each; user decides)
+## Measured on this PC (Arena 0.5.0 evaluator, 2026-10-22)
+
+- TheSauceman climb2 `policy.onnx`: **1.236 s 5/5**, identical (1.26-1.30 s) at every command
+  0.15-1.00: the command is ignored. Seed 1: moves 0.18 m during the untimed settle, 1.03 m/s at
+  0.2 s, plateau **~1.3 m/s**; **drifts right 0.35 m in 1.26 s** (y -0.01 -> -0.35, accelerating;
+  the right wall is at y = -0.40), seed 3 only 0.13 m. Trunk tilt 2-17°.
+- Ours base-s1/750: 0.30 m/s flat from the start, drift 0.05 m.
+- So his remaining losses: top speed (~1.3 vs the leaders' ~2 m/s) and lateral drift.
+
+## Why training does not look like the Arena (env.py + mjlab velocity defaults)
+
+- reset yaw is uniform in (-3.14, 3.14) and the robot spawns on a pyramid's TOP platform: most
+  experience is flat, downhill or across the slope. The Arena is 100% straight uphill at 8°, heading
+  ±2°, starting from STAND, raced for ~1-5 s.
+- 20 s episodes: few starts per hour, while a ~1.3 s race is mostly launch + first metres.
+- terrain contacts softened (solref 0.04, `_soften_terrain_contacts`) and solver 30/50; the Arena's
+  floor uses MuJoCo defaults (solref 0.02) and solver 10/20. Both were kept only for heightfield
+  edges, which a smooth ramp does not have.
+
+## Proposed: `ramp1` (his recipe + an Arena-shaped course), not a pure reproduction
+
+His published policy (1.236 s here) is the baseline, so his recipe need not be re-trained.
+ramp1 = his climb2 changes + (a) a custom smooth-ramp sub-terrain rising along +x (slope drawn in
+[8°, 12°], some flat tiles kept), spawn on it facing uphill with yaw ±2°; (b) short episodes (~4 s);
+(c) default contact softness and solver 10/20, as the Arena; (d) `save_interval` 100 (neighbouring
+checkpoints differ by up to 10x). Bundled on purpose; if it loses to 1.236 s, train his recipe pure
+as the control. Then optionally ES fine-tuning on the Arena scorer, judged on held-out seeds 6-20.
 
 - `speed1`: port his climb2 recipe whole (bundled on purpose, it is a known-good set): the table
   above. Expected: ~1.2-1.5 s if it reproduces; risk: walls/falls, then judge every checkpoint.
