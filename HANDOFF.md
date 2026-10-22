@@ -40,6 +40,19 @@ tools/status.py and tell me where things stand and what you propose next."*
 
 ## State (update every session)
 
+**Summary as of 2026-10-22 09:30 UTC (handover to another machine/agent):**
+- One run done (`base-s1`, official recipe). Its checkpoint 750 is **published and on the board:
+  5.064 s 5/5** (`rushzealot/microduck-hillclimb-base-s1`), rank ~76/85, 110 player points.
+- Nothing is training. The Colab runtime of base-s1 should have been deleted by the user (Runtime ->
+  Manage sessions); if a GPU session still shows there, ask the user to delete it.
+- Leaderboard analysed: `experiments/hill_climb_1m5/LEADERBOARD_NOTES.md`. Next run planned:
+  **`ramp1`** (see *Next step*). Not implemented yet: `next_run.toml` still says `base-s1`.
+- Two fixes are pushed but **not yet exercised on Colab**: the W&B curve mirror (`curves-<name>`
+  run on an `iteration` axis, commit `1659649`) and the notebook's clean-clone check (smoke output
+  under `logs/`, commit `282b5a4`). Watch for them on the next run.
+
+History:
+
 - 2026-10-22: Setup done by the agent. The repo is cloned from `pollen-robotics/microduck-challenges`
   (upstream at `6ff4070`), and the remote is named `upstream`. The tooling is in place: notebook, watcher,
   renderer, status tool, `.env`. colab-mcp is configured in `opencode.json`. uv is installed on the
@@ -70,21 +83,83 @@ tools/status.py and tell me where things stand and what you propose next."*
   `base-s1` **finished 08:18 UTC**; all 13 checkpoints scored and on HF. None beat 750 (later ones
   6.7-49 s), so nothing else to publish. Colab runtime to be deleted by the user (saves units).
 
-## Next step
+## Next step: run `ramp1`
 
-1. User:
-   - fill `.env`;
-   - create the W&B account;
-   - fork `pollen-robotics/microduck-challenges` to their GitHub;
-   - add these Colab secrets: `HF_TOKEN`, `WANDB_API_KEY`, `GITHUB_USERNAME`, optional `WANDB_ENTITY`.
-2. ~~Agent: set `origin`, push `main`.~~ Done.
-3. ~~Run `base-s1`~~ running (see State). When it ends: report per the challenge AGENTS.md, fill
-   `experiments/hill_climb_1m5/RUNS.md`, propose the next single change. Path B for later runs if
-   colab-mcp is not available:
-   - **Path A**: colab-mcp from the agent.
-   - **Path B**: the user opens `https://colab.research.google.com/github/rush9703/microduck-challenges/blob/main/colab/microduck_train.ipynb?authuser=<pro email>` and runs it.
-4. Supervise with `tools/status.py`. Report each run in the format of the challenge's AGENTS.md.
-5. On the user's yes: publish the best 5/5 checkpoint with `--enter`.
+The user agreed the direction: "reproducing TheSauceman alone has little value", build on it.
+**Read `experiments/hill_climb_1m5/LEADERBOARD_NOTES.md` first** (the data behind this plan).
+
+### Why
+
+- TheSauceman's climb2 (PPO from scratch, public, `SteveTarter/microduck-challenges` @ `4c8874141`)
+  scores 1.236 s 5/5 here. Measured: launch is already fast (1.03 m/s at 0.2 s), top speed plateaus
+  at ~1.3 m/s (leaders ~2 m/s), and it drifts right up to 0.35 m in 1.26 s (wall at 0.40 m).
+- Training does not look like the race: random yaw in (-3.14, 3.14) on pyramid tops (mostly flat,
+  downhill, across), 20 s episodes for a 1-5 s race, softened terrain contacts and solver 30/50
+  where the Arena uses default contacts and 10/20.
+- His published policy is the baseline to beat (1.236 s): do **not** spend a run re-training it
+  unless ramp1 loses and a control is needed.
+
+### What to implement (all in `src/microduck_challenges/hill_climb_1m5/`, one commit, bundled on purpose)
+
+1. **His climb2 recipe** (exact diff in LEADERBOARD_NOTES.md table; source:
+   `https://api.github.com/repos/SteveTarter/microduck-challenges/compare/pollen-robotics:microduck-challenges:main...4c8874141`,
+   hill_climb_1m5 files only): `forward_speed` reward (`microduck_mdp.forward_speed_reward`, w 12,
+   vel_ref 3.0); knobs forward 0.5 / upright 1.0 / step 1.0 in `challenge.toml`; upright std²
+   0.2; track_angular_velocity 0.5; body_ang_vel and angular_momentum 0; head_pose_tracking 0 and
+   head_pose_bias curriculum 0; standing envs 0; action_rate curriculum capped at -0.4 by 750;
+   `ENABLE_SYMMETRY = True`; heading_hold std 0.15.
+2. **Arena-shaped course** (our addition): a custom `SubTerrainCfg` subclass (pattern:
+   `mjlab/terrains/primitive_terrains.py` `BoxFlatTerrainCfg`; `function()` returns a
+   `TerrainOutput(origin, geometries)`) holding a smooth ramp rising along +x: a box geom pitched by
+   the slope (no heightfield, so no quantisation), slope drawn per tile in [8°, 12°] (keep
+   `max_slope_deg` as the top, its test requires >= 8), spawn origin near the LOW end on the ramp
+   surface. Keep ~20 % `BoxFlatTerrainCfg` tiles. Watch tile edges: an 8 m tile at 12° rises
+   1.7 m, so its high end is a cliff to the next tile; with ~4 s episodes at <= 2 m/s the robot
+   covers <= 8 m, so spawn within the first metre. Check the foot height ray sensor still sees it
+   (geom group 0).
+3. **Spawn like the Arena**: `cfg.events["reset_base"].params["pose_range"]`: yaw (-0.035, 0.035)
+   (±2°), x/y small (e.g. ±0.1 m, so the spawn stays near the low end and mid-lane). The Arena
+   spawns the trunk upright (yaw-only quaternion) at 0.12 m along the slope normal and settles 0.5 s:
+   same as mjlab's reset on a ramp origin.
+4. **Short episodes**: `cfg.episode_length_s = 4.0` (his sprint used 4 s; he kept 20 s on the hill
+   only because pyramid spawns start downhill, which point 2 removes). Note `NUM_STEPS_PER_ENV`-based
+   curricula are keyed on iterations, unaffected.
+5. **Arena physics**: remove `cfg.scene.spec_fn = _soften_terrain_contacts`, set
+   `cfg.sim.mujoco.iterations = 10`, `ls_iterations = 20` (the Arena's `course._compiled`). Faster too.
+6. **Denser checkpoints**: `RL_CFG.save_interval = 100` (base-s1's neighbours differed up to 10x).
+   The watcher judges each (~1 min CPU each on Colab, fine).
+7. `experiments/hill_climb_1m5/next_run.toml`: `name = "ramp1"`, `hf_ckpt_prefix` unchanged,
+   `hypothesis` = the one sentence above; keep 3000 iterations, 4096 envs (TheSauceman used 2048).
+
+Do not change: the robot cfg, the 61-number observation layout (command slots keep their tiny
+ranges), the forward command range 0.15-1.00, `heading_hold` and the critic's `heading_error`,
+`experiment_name`, `pyproject.toml` / `uv.lock`. The ramp terrain must keep the steepest slope >= 8°.
+
+### How to run it
+
+1. `uv run --group workshop pytest` (Linux/Colab; on Windows the tests need the workshop env).
+   If a test pins the old knob values or terrain, read it before changing anything; the challenge's
+   tests guard the Arena contract.
+2. **Smoke on Colab first** (GPU, minutes): train 64 envs x 20 iterations and check in the log /
+   TensorBoard: no `nan_state`, episode length capped near 200 steps (4 s at 50 Hz), robots spawn on
+   the ramp facing +x (optionally `uv run play` / render a frame). Only then the full run.
+3. Commit with the hypothesis as message, `python tools/git_push.py`, update `next_run.toml` in the
+   same commit. Launch with the notebook (Path A colab-mcp, or Path B user opens the notebook link).
+   **Tell the user before the full run** (≈2-3.5 h on an L4, ≈15-20 Colab compute units).
+4. Follow with `tools/status.py`. Judge every checkpoint; report in the challenge AGENTS.md format;
+   fill `RUNS.md`.
+
+### Decision rule after ramp1
+
+- Best 5/5 checkpoint < 1.236 s: ask the user to publish it (needs yes); then consider ES
+  fine-tuning (LEADERBOARD_NOTES "family 2"), **validated on held-out seeds 6-20**, not only the
+  Arena's 5 official seeds (else it is the seed-overfitting the top-10 do).
+- Between 1.236 s and 5.064 s: still an improvement on our entry, ask the user to publish; then
+  run TheSauceman's climb2 pure as a control to find which ramp1 change hurt.
+- Worse, or not 5/5: inspect replays (`tools/render_trace.py`), check terrain/spawn, report before
+  spending another run.
+
+Not pursued unless the user asks: the top-10 "branch table" ONNX edits tuned on the official seeds.
 
 ## Permissions granted by the user
 
@@ -166,7 +241,8 @@ Bring the run back first (`tools/status.py --pull`, or `hf download` of just `pr
   resumes from the latest checkpoint in the HF repo. **On resume, the curricula restart from stage 0**
   (they are keyed on the step counter of the new process). Prefer finishing a run in one session:
   3000 iterations take about 1–2.5 h on an L4.
-- Checkpoints come every 250 iterations, and the best one is often *not* the last. The watcher judges them all.
+- Checkpoints come every `save_interval` iterations (250 in the official recipe), and the best one is
+  often *not* the last. The watcher judges them all.
 - Scores off the Space are indicative. The x86 Colab, and this PC (5.884 vs 5.876 s), are close.
 - `publish` refuses a run started from uncommitted changes. The notebook asserts a clean clone.
 - Every run's commit must be pushed before it is published, so the policy's code link resolves.
@@ -175,3 +251,16 @@ Bring the run back first (`tools/status.py --pull`, or `hf download` of just `pr
 - colab-mcp (`opencode.json`) needs OpenCode to have been **restarted** after it was added. Its first tool
   is `open_colab_browser_connection`, which opens a Colab tab that the user must have logged into. It is
   officially tested on Gemini CLI, Claude Code and Windsurf, not OpenCode. If it fails, use Path B.
+- colab-mcp in practice (base-s1): it opens `colab.research.google.com/notebooks/empty.ipynb#mcpProxyToken=...`
+  under the browser's DEFAULT Google account; the user must make the Pro account the one in that tab.
+  Long cells time out the MCP call (`-32001`) but keep running: poll with `get_cells(includeOutputs)`.
+  Every reconnect opens a NEW scratch tab (and possibly a new session): reuse the existing tab, and
+  never run code in a fresh scratch tab while a run is going, it may allocate a second VM.
+  The tab can drop to "正在连接" for hours while the VM keeps training; tell the user not to click
+  connect/change runtime. Liveness = HF `status.json` `updated_utc`.
+- After a run, ask the user to delete the GPU session (Runtime -> Manage sessions): closing the
+  tab does not stop billing promptly.
+- The original `.env` GITHUB_TOKEN was once printed in a chat log and has been rotated. Check `.env`
+  with code that prints only "set/EMPTY" and lengths, never values.
+- Arena eval of another person's public policy, for comparison: `hf download <repo> policy.onnx`, then
+  `arena score`. `logs/others/` is git-ignored.
