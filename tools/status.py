@@ -81,20 +81,20 @@ def wandb_curves(env: dict, name: str) -> None:
         return
     api = wandb.Api()
     path = f"{env.get('WANDB_ENTITY') or api.default_entity}/{env.get('WANDB_PROJECT', 'microduck-arena')}"
-    runs = [r for r in api.runs(path, filters={"group": name}) if r.job_type != "arena-eval"]
+    runs = [r for r in api.runs(path, filters={"group": name}) if r.job_type == "curves"]
     if not runs:
-        print(f"  (W&B: no training run in group {name!r} of {path})")
+        print(f"  (W&B: no curves run in group {name!r} of {path})")
         return
     for run in runs:
-        print(f"  W&B training run {run.name} [{run.state}] {run.url}")
-        hist = run.history(keys=list(CURVES), samples=400, pandas=False)
+        print(f"  W&B training curves {run.name} [{run.state}] {run.url}")
+        hist = list(run.scan_history(keys=["iteration", *CURVES]))
         for tag, (what, how) in CURVES.items():
-            pts = [(h.get("_step"), h[tag]) for h in hist if h.get(tag) is not None]
+            pts = [(h["iteration"], h[tag]) for h in hist if h.get(tag) is not None]
             if not pts:
                 continue
-            tail = pts[-min(len(pts), 5):]
-            trend = " -> ".join(f"{v:.3g}" for _, v in tail)
-            print(f"    {tag:<40} {trend:<40} {what}; {how}")
+            idx = sorted({int(i * (len(pts) - 1) / 5) for i in range(6)})
+            trend = " -> ".join(f"{pts[i][1]:.3g}@{pts[i][0]}" for i in idx)
+            print(f"    {tag:<38} {trend}\n      {what}; {how}")
 
 
 def main() -> None:

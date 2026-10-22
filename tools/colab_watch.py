@@ -179,19 +179,25 @@ class Watcher:
             from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
             if self.train_wb is None:
+                # job_type "curves" (not "train"): the first runs' "train-<name>" W&B runs logged
+                # rsl_rl's */time scalars (step = seconds) on the iteration axis and froze.
                 self.train_wb = wandb.init(
                     project=os.environ.get("WANDB_PROJECT", "microduck-arena"),
                     entity=os.environ.get("WANDB_ENTITY") or None,
-                    name=f"{self.args.name}-train", group=self.args.name, job_type="train",
-                    id=f"train-{self.args.name}", resume="allow", reinit="create_new",
+                    name=f"{self.args.name}-train", group=self.args.name, job_type="curves",
+                    id=f"curves-{self.args.name}", resume="allow", reinit="create_new",
                     config={"event": self.event, "run_name": self.args.name, "run_id": run.id},
                 )
+                self.train_wb.define_metric("iteration")
+                self.train_wb.define_metric("*", step_metric="iteration")
                 log(f"W&B training curves: {self.train_wb.url}")
             if self.acc is None:
                 self.acc = EventAccumulator(str(run.path), size_guidance={"scalars": 0})
             self.acc.Reload()
             by_step: dict[int, dict] = {}
             for tag in self.acc.Tags().get("scalars", []):
+                if tag.endswith("/time"):
+                    continue  # rsl_rl logs these against wall-clock seconds, not iterations
                 for e in self.acc.Scalars(tag):
                     if e.step > self.curve_step:
                         by_step.setdefault(e.step, {})[tag] = e.value
@@ -199,7 +205,7 @@ class Watcher:
             if steps and not final:
                 steps = steps[:-1]  # the newest step may still be half written
             for s in steps:
-                self.train_wb.log(by_step[s], step=s)
+                self.train_wb.log({"iteration": s, **by_step[s]})
                 self.curve_step = s
         except Exception:  # noqa: BLE001
             log("curve mirror error (ignored):\n" + traceback.format_exc(limit=3))
