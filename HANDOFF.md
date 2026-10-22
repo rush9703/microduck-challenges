@@ -26,7 +26,16 @@ follow later (same tooling, another `experiments/<folder>/`).
   then closed after an aborted call and needs an OpenCode restart. The Pro account must be the one in
   the Colab tab (`?authuser=<pro email>` in the URL, or make it the browser's first-signed-in account).
   Colab Secrets and Drive must be set up under the **Pro** account.
-- No training run yet. No publication yet.
+- No publication yet.
+- **2026-10-22 04:40 UTC: run `base-s1` TRAINING on Colab Pro (L4)**, commit `e463b80`, launched by the
+  agent through colab-mcp (Colab tab under the Pro account; Drive mounted; secrets set). ~4.3 s/iter,
+  so ~3.5 h for 3000 iterations. Checks before it on Colab: pytest 66 passed, GPU smoke OK, reference
+  scored 5.880 s 5/5. The first start crashed (rsl_rl W&B writer, see Gotchas); fixed by TensorBoard + mirror.
+  - HF: `rushzealot/mjlab-hillclimb1m5-microduck-base-s1` (also holds the failed start's folder
+    `2026-10-22_04-34-39_base-s1`, no checkpoints, ignored by status.py)
+  - W&B: curves `.../microduck-arena/runs/train-base-s1`, Arena scores `.../runs/eval-base-s1`
+    (entity `rush000003-arizona-state-university`)
+  - Follow it: `tools/status.py` (below). Colab's notebook cell "7. Monitor loop" keeps the kernel busy.
 
 ## Next step
 
@@ -36,7 +45,9 @@ follow later (same tooling, another `experiments/<folder>/`).
    - fork `pollen-robotics/microduck-challenges` to their GitHub;
    - add these Colab secrets: `HF_TOKEN`, `WANDB_API_KEY`, `GITHUB_USERNAME`, optional `WANDB_ENTITY`.
 2. ~~Agent: set `origin`, push `main`.~~ Done.
-3. Run `colab/microduck_train.ipynb` for run `base-s1`, the baseline recipe unchanged:
+3. ~~Run `base-s1`~~ running (see State). When it ends: report per the challenge AGENTS.md, fill
+   `experiments/hill_climb_1m5/RUNS.md`, propose the next single change. Path B for later runs if
+   colab-mcp is not available:
    - **Path A**: colab-mcp from the agent.
    - **Path B**: the user opens `https://colab.research.google.com/github/rush9703/microduck-challenges/blob/main/colab/microduck_train.ipynb?authuser=<pro email>` and runs it.
 4. Supervise with `tools/status.py`. Report each run in the format of the challenge's AGENTS.md.

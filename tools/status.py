@@ -20,10 +20,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 ARENA = "https://pollen-robotics-microduck-arena.hf.space"
 CURVES = {  # tag -> (what it is, how to read it)
     "Train/mean_episode_length": ("episode length (steps, 1000 = full 20 s)", "healthy when climbing toward 1000"),
-    "Episode_Termination/fell_over": ("share of episodes ending in a fall", "healthy when falling toward 0"),
+    "Episode_Termination/fell_over": ("episodes ending in a fall, per iteration (out of ~100 at the start)", "healthy when falling toward 0"),
     "Episode_Reward/track_linear_velocity": ("speed-command tracking reward", "should keep growing; flat while total rises = farming"),
     "Episode_Termination/nan_state": ("NaN physics terminations", "should be ~0"),
     "Train/mean_reward": ("total reward", "context only: the Arena score is what counts"),
@@ -128,7 +129,10 @@ def main() -> None:
 
     for repo in repos:
         print(f"\n== {repo}")
+        curves_shown = set()
         for st in hf_status(api, repo):
+            if not st.get("checkpoints"):
+                continue  # a start that failed before its first checkpoint
             alive = "TRAINING" if st["training_alive"] else "stopped"
             print(f"  run {st['run_id']} [{alive}] iteration {st['iteration']}/{st['iterations_planned']}  (updated {st['updated_utc']})")
             for e in st["evaluations"]:
@@ -142,7 +146,9 @@ def main() -> None:
                       f"{rank_of(b['score'], b['seeds_finished'], rows)} of {len(rows) + 1} (reference 5.876s)")
             if st.get("wandb_eval_url"):
                 print(f"  W&B eval: {st['wandb_eval_url']}")
-            wandb_curves(env, st["run_name"])
+            if st["run_name"] not in curves_shown:
+                curves_shown.add(st["run_name"])
+                wandb_curves(env, st["run_name"])
         if a.pull:
             snapshot_download(repo, local_dir=str(ROOT / "logs" / "rsl_rl"), token=env["HF_TOKEN"])
             print(f"  pulled into logs/rsl_rl/")
