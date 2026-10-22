@@ -1,0 +1,11 @@
+# The training the Colab notebook (colab/microduck_train.ipynb) launches next.
+# The agent edits this file, commits it together with the change it describes, and pushes;
+# the user (or the agent through colab-mcp) then runs the notebook. One run = one commit.
+name = "base-s1"            # unique, short, says the change; becomes --agent.run-name
+task = "Mjlab-HillClimb1m5-MicroDuck"
+event = "hill-climb-1m5"
+num_envs = 4096
+max_iterations = 3000
+seed = 1
+hf_ckpt_prefix = "mjlab-hillclimb1m5-microduck"   # private repo <hf_user>/<prefix>-<name>
+hypothesis = "Baseline: the recipe unchanged, to see what Colab produces against the reference (5.876 s, 5/5)."

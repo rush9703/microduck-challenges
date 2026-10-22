@@ -1,5 +1,9 @@
 # AGENTS.md
 
+> **This is a personal fork with a Colab workflow. Read [HANDOFF.md](HANDOFF.md) first**: it holds
+> the current state, the next step, the permissions the user granted and how training runs here
+> (Colab + W&B + private HF repos, not a local GPU). Then read the challenge's AGENTS.md below.
+
 This repository holds one training folder per challenge open on the Microduck Arena
 (`src/microduck_challenges/<folder>/`). A user clones it to train a policy for one challenge,
 publish it to their Hugging Face account and enter it on the Arena.
