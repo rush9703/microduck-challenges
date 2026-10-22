@@ -18,7 +18,14 @@ follow later (same tooling, another `experiments/<folder>/`).
   (upstream at `6ff4070`), and the remote is named `upstream`. The tooling is in place: notebook, watcher,
   renderer, status tool, `.env`. colab-mcp is configured in `opencode.json`. uv is installed on the
   Windows PC. Pollen's reference scored **5.884 s 5/5** on the PC's CPU (Space: 5.876 s).
-- **Blocked on the user**: filling `.env`, the W&B account, forking on GitHub, the Colab secrets (see *Next step*).
+- 2026-10-22 (later): `.env` filled and checked (HF `rushzealot` write token OK; W&B entity is the
+  team `rush000003-arizona-state-university`, project `microduck-arena` created; GitHub `rush9703`).
+  Fork `rush9703/microduck-challenges` created, `origin` set, `main` pushed (push uses `GITHUB_TOKEN`
+  from `.env` via an http extraheader, never stored in git config).
+- colab-mcp: the browser opened Colab under the user's *other* (non-Pro) Google account; the MCP server
+  then closed after an aborted call and needs an OpenCode restart. The Pro account must be the one in
+  the Colab tab (`?authuser=<pro email>` in the URL, or make it the browser's first-signed-in account).
+  Colab Secrets and Drive must be set up under the **Pro** account.
 - No training run yet. No publication yet.
 
 ## Next step
@@ -28,10 +35,10 @@ follow later (same tooling, another `experiments/<folder>/`).
    - create the W&B account;
    - fork `pollen-robotics/microduck-challenges` to their GitHub;
    - add these Colab secrets: `HF_TOKEN`, `WANDB_API_KEY`, `GITHUB_USERNAME`, optional `WANDB_ENTITY`.
-2. Agent: `git remote add origin https://github.com/<GITHUB_USERNAME>/microduck-challenges`, push `main`.
+2. ~~Agent: set `origin`, push `main`.~~ Done.
 3. Run `colab/microduck_train.ipynb` for run `base-s1`, the baseline recipe unchanged:
    - **Path A**: colab-mcp from the agent.
-   - **Path B**: the user opens `https://colab.research.google.com/github/<GITHUB_USERNAME>/microduck-challenges/blob/main/colab/microduck_train.ipynb` and runs it.
+   - **Path B**: the user opens `https://colab.research.google.com/github/rush9703/microduck-challenges/blob/main/colab/microduck_train.ipynb?authuser=<pro email>` and runs it.
 4. Supervise with `tools/status.py`. Report each run in the format of the challenge's AGENTS.md.
 5. On the user's yes: publish the best 5/5 checkpoint with `--enter`.
 
