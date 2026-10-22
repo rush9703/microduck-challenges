@@ -12,6 +12,32 @@ challenge **1.5 m Hill Climb** (`hill-climb-1m5`, task `Mjlab-HillClimb1m5-Micro
 entry, then beat Pollen's reference (5.876 s, 5/5 at 0.55 m/s), then iterate. Other challenges may
 follow later (same tooling, another `experiments/<folder>/`).
 
+## Starting on a new machine / with a new agent
+
+Everything lives in the fork, except `.env` (secrets, git-ignored). The cloud side (Colab secrets,
+W&B project, HF repos, Drive backup) is tied to the accounts, not to a machine.
+
+1. Install `git` and `uv` (`pip install uv`, or https://docs.astral.sh/uv/). uv fetches Python 3.12/3.13 itself.
+2. `git clone https://github.com/rush9703/microduck-challenges && cd microduck-challenges`
+   then `git remote add upstream https://github.com/pollen-robotics/microduck-challenges`.
+   Keep the clone **outside** OneDrive/Dropbox (`.venv` and `logs/` are large).
+3. Put the user's `.env` in the clone root (from a password manager, never chat/email/git), or
+   copy `.env.example` and refill it. Check it **without printing values**:
+   `uv run --no-project --python 3.12 --with huggingface_hub --with wandb python tools/status.py`
+4. Git identity for this clone: `git config user.name rush9703` and
+   `git config user.email 94340302+rush9703@users.noreply.github.com`. Push with `python tools/git_push.py`.
+5. Colab from the agent: colab-mcp is declared in `opencode.json` (OpenCode) and `.mcp.json`
+   (Claude Code); Gemini CLI / others: same command. Restart the agent after cloning. The browser's
+   Colab tab must be under the **Pro** Google account. Without MCP: the user opens
+   `https://colab.research.google.com/github/rush9703/microduck-challenges/blob/main/colab/microduck_train.ipynb`
+   and runs it (Path B).
+6. Publishing locally needs the full env (Linux or Windows; CPU is fine): `uv sync --frozen` (on
+   Windows set `UV_PROJECT_ENVIRONMENT` outside OneDrive and `PYTHONUTF8=1`, see below).
+
+First message to give the new agent: *"Read HANDOFF.md, then
+src/microduck_challenges/hill_climb_1m5/AGENTS.md and experiments/hill_climb_1m5/RUNS.md. Run
+tools/status.py and tell me where things stand and what you propose next."*
+
 ## State (update every session)
 
 - 2026-10-22: Setup done by the agent. The repo is cloned from `pollen-robotics/microduck-challenges`
@@ -41,6 +67,9 @@ follow later (same tooling, another `experiments/<folder>/`).
 - **2026-10-22 07:38 UTC: published** checkpoint 750 of `base-s1` (user's yes) from the Windows PC:
   `rushzealot/microduck-hillclimb-base-s1`, entered as `hillclimb-base-s1`, **5.064 s 5/5**, board rank
   75/83 (19 by person), 110 player points. Details in `experiments/hill_climb_1m5/RUNS.md`.
+  `base-s1` was still training at the time (2464/3000, expected end ~08:20 UTC); its checkpoints
+  2250-2999 are scored by the watcher into HF `status.json`: read them with `tools/status.py` and
+  update RUNS.md. If one beats 5.064 s 5/5, ask the user before publishing it.
 
 ## Next step
 
