@@ -82,6 +82,9 @@ class Watcher:
         self.best: dict | None = None
         self.results: dict[tuple[str, int], dict] = {}
         self.wb = None
+        self.train_wb = None
+        self.acc = None
+        self.curve_step = -1
         self.api = None
         if args.hf_repo:
             from huggingface_hub import HfApi
@@ -165,6 +168,42 @@ class Watcher:
         except Exception:  # noqa: BLE001
             log("W&B/video error (ignored):\n" + traceback.format_exc(limit=3))
 
+    # ---- training curves: TensorBoard -> W&B -----------------------------------------------
+    # rsl_rl's own W&B writer passes wandb.Settings(start_method=...), which the wandb locked in
+    # uv.lock rejects, so training logs to TensorBoard and the curves are mirrored from here.
+    def mirror_curves(self, run, final: bool) -> None:
+        if self.wb is None:
+            return
+        try:
+            import wandb
+            from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+
+            if self.train_wb is None:
+                self.train_wb = wandb.init(
+                    project=os.environ.get("WANDB_PROJECT", "microduck-arena"),
+                    entity=os.environ.get("WANDB_ENTITY") or None,
+                    name=f"{self.args.name}-train", group=self.args.name, job_type="train",
+                    id=f"train-{self.args.name}", resume="allow", reinit="create_new",
+                    config={"event": self.event, "run_name": self.args.name, "run_id": run.id},
+                )
+                log(f"W&B training curves: {self.train_wb.url}")
+            if self.acc is None:
+                self.acc = EventAccumulator(str(run.path), size_guidance={"scalars": 0})
+            self.acc.Reload()
+            by_step: dict[int, dict] = {}
+            for tag in self.acc.Tags().get("scalars", []):
+                for e in self.acc.Scalars(tag):
+                    if e.step > self.curve_step:
+                        by_step.setdefault(e.step, {})[tag] = e.value
+            steps = sorted(by_step)
+            if steps and not final:
+                steps = steps[:-1]  # the newest step may still be half written
+            for s in steps:
+                self.train_wb.log(by_step[s], step=s)
+                self.curve_step = s
+        except Exception:  # noqa: BLE001
+            log("curve mirror error (ignored):\n" + traceback.format_exc(limit=3))
+
     # ---- persistence -----------------------------------------------------------------------
     def write_status(self, run, alive: bool) -> None:
         it = last_iteration(self.train_log)
@@ -181,6 +220,7 @@ class Watcher:
                                   key=lambda r: r["checkpoint"]),
             "best": self.best,
             "wandb_eval_url": getattr(self.wb, "url", None),
+            "wandb_train_url": getattr(self.train_wb, "url", None),
         }
         (run.path / "status.json").write_text(json.dumps(status, indent=1))
         if self.train_log.exists():
@@ -222,6 +262,7 @@ class Watcher:
                 except Exception:  # noqa: BLE001
                     log(f"evaluation crashed on {run.id}/{n}:\n" + traceback.format_exc(limit=5))
                     self.results[(run.id, n)] = {"checkpoint": n, "error": "crash"}
+            self.mirror_curves(run, final=not alive)
             self.write_status(run, alive)
             self.sync(run)
         return done
@@ -243,6 +284,8 @@ class Watcher:
                 f"{self.best['seeds_finished']}/5 at {self.best['command_vx']:.2f} m/s")
         if self.wb is not None:
             self.wb.finish()
+        if self.train_wb is not None:
+            self.train_wb.finish()
 
 
 def main() -> None:
@@ -261,8 +304,9 @@ def main() -> None:
     w = Watcher(args)
     if args.once:
         w.pass_once(alive=False)
-        if w.wb is not None:
-            w.wb.finish()
+        for r in (w.wb, w.train_wb):
+            if r is not None:
+                r.finish()
     else:
         w.forever()
 

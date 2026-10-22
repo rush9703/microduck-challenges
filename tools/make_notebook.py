@@ -143,14 +143,14 @@ if ALLOW_RESUME:
         print(f"RESUMING {run_dir} from checkpoint {n} for {iterations} more iterations "
               "(note: curricula restart from stage 0 on resume)")
 
-logger = "wandb" if os.environ["WANDB_API_KEY"] else "tensorboard"
+# TensorBoard, always: rsl_rl's W&B writer passes wandb.Settings(start_method=...), which the
+# wandb version in uv.lock rejects. tools/colab_watch.py mirrors the curves into W&B instead.
 os.makedirs("logs", exist_ok=True)
 train_cmd = ["uv", "run", "--frozen", "train", TASK,
              "--env.scene.num-envs", str(cfg["num_envs"]), "--agent.max-iterations", str(iterations),
-             "--agent.seed", str(cfg["seed"]), "--agent.logger", logger, "--agent.run-name", NAME,
-             "--agent.wandb-project", os.environ["WANDB_PROJECT"], *resume]
+             "--agent.seed", str(cfg["seed"]), "--agent.logger", "tensorboard", "--agent.run-name", NAME, *resume]
 train = subprocess.Popen(train_cmd, stdout=open(f"logs/{NAME}.log", "a"), stderr=subprocess.STDOUT,
-                         start_new_session=True, env={**os.environ, "WANDB_RUN_GROUP": NAME})
+                         start_new_session=True)
 watch_cmd = ["uv", "run", "--frozen", "--group", "workshop", "--with", "wandb", "--with", "imageio[ffmpeg]",
              "python", "tools/colab_watch.py", "--name", NAME, "--folder", CHALLENGE,
              "--hf-repo", CKPT_REPO, "--train-pid", str(train.pid)]
@@ -173,11 +173,6 @@ def tail(path, n=4):
     except OSError:
         return []
 
-def wandb_url():
-    text = "\n".join(tail(f"logs/{NAME}.log", 100000))
-    m = re.findall(r"View run at (\S+)", text)
-    return m[0] if m else None
-
 t0 = time.time()
 while train.poll() is None or watch.poll() is None:
     clear_output(wait=True)
@@ -185,9 +180,9 @@ while train.poll() is None or watch.poll() is None:
     it = re.findall(r"Learning iteration (\d+)/(\d+)", log)
     print(f"run {NAME}  |  {(time.time() - t0) / 60:.0f} min in this cell  |  "
           f"iteration {it[-1][0] + '/' + it[-1][1] if it else '-'}  |  training {'running' if train.poll() is None else 'ended ' + str(train.returncode)}")
-    print("W&B training:", wandb_url())
     for st in glob.glob(f"logs/rsl_rl/{CHALLENGE}/*_{NAME}/status.json"):
         s = json.load(open(st))
+        print("W&B curves: ", s.get("wandb_train_url"))
         print("W&B eval:   ", s.get("wandb_eval_url"))
         for e in s["evaluations"]:
             print(f"  ckpt {e['checkpoint']:>5}: " + (f"{e['score']:.3f}s {e['seeds_finished']}/5 at {e['command_vx']:.2f} m/s" if "score" in e else "FAILED"))

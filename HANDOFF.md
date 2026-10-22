@@ -105,6 +105,10 @@ Linux/WSL box also works. **Publishing needs the user's yes.**
 
 ## Gotchas
 
+- **Train with `--agent.logger tensorboard`, never `wandb`**: rsl_rl's W&B writer calls
+  `wandb.Settings(start_method="thread")`, which the wandb in `uv.lock` (0.30) rejects with a pydantic
+  `extra_forbidden` error at iteration 0. `tools/colab_watch.py` mirrors the TensorBoard scalars into a
+  W&B run `<name>-train` (group `<name>`) instead; Arena scores go to `<name>-eval`.
 - Colab Pro has no background execution. If the tab or the VM dies, rerun the notebook: cell 6
   resumes from the latest checkpoint in the HF repo. **On resume, the curricula restart from stage 0**
   (they are keyed on the step counter of the new process). Prefer finishing a run in one session:
