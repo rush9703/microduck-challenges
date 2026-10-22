@@ -36,6 +36,11 @@ follow later (same tooling, another `experiments/<folder>/`).
   - W&B: curves `.../microduck-arena/runs/train-base-s1`, Arena scores `.../runs/eval-base-s1`
     (entity `rush000003-arizona-state-university`)
   - Follow it: `tools/status.py` (below). Colab's notebook cell "7. Monitor loop" keeps the kernel busy.
+  - During the run the Colab tab lost its frontend connection ("正在连接"), but the VM kept training
+    (status.json on HF kept updating). Judge liveness by HF status.json, not by the tab.
+- **2026-10-22 07:38 UTC: published** checkpoint 750 of `base-s1` (user's yes) from the Windows PC:
+  `rushzealot/microduck-hillclimb-base-s1`, entered as `hillclimb-base-s1`, **5.064 s 5/5**, board rank
+  75/83 (19 by person), 110 player points. Details in `experiments/hill_climb_1m5/RUNS.md`.
 
 ## Next step
 
@@ -110,9 +115,18 @@ uv run --no-project --python 3.12 --with huggingface_hub --with wandb python too
 uv run --no-project --python 3.12 --with "microduck-arena @ https://github.com/pollen-robotics/microduck-arena/releases/download/v0.5.0/microduck_arena-0.5.0-py3-none-any.whl" arena score <policy.onnx> --event hill-climb-1m5
 ```
 
-Publishing also runs on Colab. `uv run publish --run ... --checkpoint N --repo <hf>/microduck-<name> --no-private --enter`
-needs the project environment, which is installed there. The status tool's `--pull` plus a
-Linux/WSL box also works. **Publishing needs the user's yes.**
+Publishing works **from the Windows PC** (done for base-s1), exporting on CPU:
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = "C:\Users\lli153\.venvs\microduck"   # full env, outside OneDrive (installed)
+$env:PYTHONUTF8 = "1"   # else publish writes README.md in cp936 and the HF upload fails to decode it
+# HF_TOKEN must be in the environment (load it from .env without printing it)
+uv run --frozen publish --run logs/rsl_rl/hill_climb_1m5/<run> --checkpoint N --repo rushzealot/microduck-<name> `
+  --description "<one line>" --no-private --device cpu --enter
+```
+
+Bring the run back first (`tools/status.py --pull`, or `hf download` of just `provenance.json`,
+`params/*`, `model_N.pt`). It can also run on Colab. **Publishing needs the user's yes.**
 
 ## Gotchas
 

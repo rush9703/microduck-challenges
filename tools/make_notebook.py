@@ -81,7 +81,8 @@ if not os.path.isdir(f"{REPO}/.git"):
 %cd {REPO}
 !git fetch -q origin && git checkout -q {BRANCH} && git pull -q --ff-only origin {BRANCH}
 !git log -1 --format="training commit %h: %s"
-dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], capture_output=True, text=True).stdout
+# publish records any `git status --porcelain` output, untracked files included, as "dirty"
+dirty = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True).stdout
 assert not dirty, "the clone has local changes: publish would refuse this run\n" + dirty
 ''')
 
@@ -98,7 +99,8 @@ cfg = tomllib.load(open(f"experiments/{CHALLENGE}/next_run.toml", "rb"))
 TASK, EVENT = cfg["task"], cfg["event"]
 if RUN_TESTS_AND_SMOKE:
     !uv run --frozen --group workshop pytest -q 2>&1 | tail -3
-    !uv run --frozen train {TASK} --env.scene.num-envs 64 --agent.max-iterations 2 --agent.logger tensorboard --agent.run-name smoke 2>&1 | grep -E "Learning iteration|Error|error" | tail -3
+    # its output goes under logs/ (git-ignored): an untracked file in the clone makes the run "dirty"
+    !mkdir -p logs && uv run --frozen train {TASK} --env.scene.num-envs 64 --agent.max-iterations 2 --agent.logger tensorboard --agent.run-name smoke > logs/smoke.txt 2>&1; grep -E "Learning iteration|Traceback|Error" logs/smoke.txt | tail -3
     !rm -rf logs/rsl_rl/{CHALLENGE}/*_smoke
 if SCORE_REFERENCE:
     ref = EVENT
